@@ -1,6 +1,6 @@
-package com.example.store.step03;
+package com.example.store;
 
-import com.example.store.step03.model.Event;
+import com.example.store.model.Event;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;

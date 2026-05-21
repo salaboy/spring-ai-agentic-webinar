@@ -1,13 +1,12 @@
-package com.example.store.step03;
+package com.example.store;
 
-import com.example.store.step03.model.Event;
-import io.dapr.spring.messaging.DaprMessagingTemplate;
-import io.dapr.testcontainers.DaprContainer;
-import io.dapr.testcontainers.wait.strategy.DaprWait;
+import com.example.store.model.Event;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.kafka.core.KafkaTemplate;
 
 import java.time.Duration;
 
@@ -20,31 +19,26 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class StoreTests {
 
     @Autowired
-    private DaprContainer daprContainer;
-
-    @Autowired
-    DaprMessagingTemplate<Event> messagingTemplate;
+    KafkaTemplate<String, Event> kafkaTemplate;
 
     @Autowired
     EventsRestController eventsRestController;
 
+    @Value("${store.events.topic}")
+    String topic;
+
     @BeforeEach
     void setUp() {
-        DaprWait.forSubscription("pubsub", "pubsubTopic").waitUntilReady(daprContainer);
-        org.testcontainers.Testcontainers.exposeHostPorts(8080);
         eventsRestController.clearEvents();
     }
 
     @Test
-    void testPubSubWithMessagingTemplate() throws InterruptedException {
-        // Wait for Dapr to be ready.
-        Thread.sleep(2000);
-
+    void testPubSubWithKafkaTemplate() {
         assertTrue(eventsRestController.getEvents().isEmpty());
 
-        messagingTemplate.send("pubsubTopic", new Event("SHIPMENT-123", "shipped", "2024-06-05T12:34:56Z"));
+        kafkaTemplate.send(topic, new Event("SHIPMENT-123", "shipped", "2024-06-05T12:34:56Z"));
 
-        await().atMost(Duration.ofSeconds(5))
+        await().atMost(Duration.ofSeconds(15))
                 .until(eventsRestController.getEvents()::size, equalTo(1));
     }
 }

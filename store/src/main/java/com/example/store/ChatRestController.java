@@ -1,4 +1,4 @@
-package com.example.store.step03;
+package com.example.store;
 
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;

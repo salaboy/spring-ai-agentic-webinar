@@ -1,32 +1,37 @@
 package main
 
 import (
-	"context"
-	"fmt"
 	"log"
 	"net"
 	"os"
+	"strings"
 
-	dapr "github.com/dapr/go-sdk/client"
+	"github.com/segmentio/kafka-go"
 	pb "github.com/spring-io-2026-workshop/shipping/gen/shippingpb"
 	"github.com/spring-io-2026-workshop/shipping/server"
 	"google.golang.org/grpc"
 )
 
 func main() {
-	var daprClient dapr.Client
-	var err error
+	brokers := os.Getenv("KAFKA_BROKERS")
+	if brokers == "" {
+		brokers = "localhost:9092"
+	}
+	topic := os.Getenv("KAFKA_TOPIC")
+	if topic == "" {
+		topic = "shipments"
+	}
 
-	ctx := context.Background()
-	if host, port := os.Getenv("DAPR_HOST"), os.Getenv("DAPR_PORT"); host != "" && port != "" {
-		daprClient, err = dapr.NewClientWithAddressContext(ctx, fmt.Sprintf("%s:%s", host, port))
-	} else {
-		daprClient, err = dapr.NewClient()
+	kafkaWriter := &kafka.Writer{
+		Addr:     kafka.TCP(strings.Split(brokers, ",")...),
+		Topic:    topic,
+		Balancer: &kafka.LeastBytes{},
 	}
-	if err != nil {
-		log.Fatalf("Failed to create Dapr client: %v", err)
-	}
-	defer daprClient.Close()
+	defer func() {
+		if err := kafkaWriter.Close(); err != nil {
+			log.Printf("Failed to close Kafka writer: %v", err)
+		}
+	}()
 
 	lis, err := net.Listen("tcp", ":9091")
 	if err != nil {
@@ -34,9 +39,9 @@ func main() {
 	}
 
 	grpcServer := grpc.NewServer()
-	pb.RegisterShippingServiceServer(grpcServer, server.NewShippingServer(daprClient))
+	pb.RegisterShippingServiceServer(grpcServer, server.NewShippingServer(kafkaWriter))
 
-	log.Printf("Shipping gRPC server listening on %s", lis.Addr())
+	log.Printf("Shipping gRPC server listening on %s (kafka brokers=%s topic=%s)", lis.Addr(), brokers, topic)
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalf("Failed to serve: %v", err)
 	}

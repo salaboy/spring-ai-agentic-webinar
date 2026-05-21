@@ -1,26 +1,4 @@
 services:
-  dapr-shipping:
-    image: "daprio/daprd:1.17.0"
-    container_name: dapr-shipping
-    command: [
-      "./daprd",
-      "--app-id", "shipping-dapr",
-      "--app-channel-address", "shipping",
-      "--app-port", "9091",
-      "--app-protocol", "grpc",
-      "--placement-host-address", "placement:50006", # Dapr's placement service can be reach via the docker DNS entry
-      "--scheduler-host-address", "scheduler:50007", # Dapr's scheduler service can be reach via the docker DNS entry
-      "--resources-path", "./components",
-      "--config", "/components/configuration.yaml" # Reference the Dapr configuration defined in components/configuration.yaml
-    ]
-    ports:
-      - "50011:50001" # Dapr sidecar gRPC port
-    volumes:
-      - "./components/:/components" # Mount our components folder for the runtime to use. The mounted location must match the --resources-path argument.
-    depends_on:
-      - kafka
-    restart: on-failure
-    
   shipping:
     image: ghcr.io/salaboy/springio-shipping:step-03
     container_name: shipping
@@ -29,13 +7,15 @@ services:
     ports:
       - "9091:9091"
     environment:
-      - DAPR_HOST=dapr-shipping # Dapr sidecar host
-      - DAPR_PORT=50001 # Dapr sidecar port 
+      - KAFKA_BROKERS=kafka:9093
+      - KAFKA_TOPIC=shipments
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
       - OTEL_SERVICE_NAME=shipping
       - OTEL_TRACES_EXPORTER=otlp
+    depends_on:
+      - kafka
     restart: on-failure
-    
+
   postgres:
     image: library/postgres:17-alpine
     container_name: reshapr-postgres

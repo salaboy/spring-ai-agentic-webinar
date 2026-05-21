@@ -1,4 +1,4 @@
-package com.example.store.step03.tracing;
+package com.example.store.tracing;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

@@ -1,8 +1,8 @@
-package com.example.store.step03;
+package com.example.store;
 
-import com.example.store.step03.model.MerchItem;
-import com.example.store.step03.model.Order;
-import com.example.store.step03.model.OrderLine;
+import com.example.store.model.MerchItem;
+import com.example.store.model.Order;
+import com.example.store.model.OrderLine;
 
 import io.modelcontextprotocol.client.McpClient;
 import io.modelcontextprotocol.client.McpSyncClient;

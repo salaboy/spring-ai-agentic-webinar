@@ -1,4 +1,4 @@
-package com.example.store.step03.model;
+package com.example.store.model;
 
 public record Event(String shipmentId, String status, String statusDate) {
 }

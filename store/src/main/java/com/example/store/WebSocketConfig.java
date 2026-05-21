@@ -1,4 +1,4 @@
-package com.example.store.step03;
+package com.example.store;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;

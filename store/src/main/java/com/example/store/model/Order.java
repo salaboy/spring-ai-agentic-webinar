@@ -1,4 +1,4 @@
-package com.example.store.step03.model;
+package com.example.store.model;
 
 import java.util.List;
 

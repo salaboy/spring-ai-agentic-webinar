@@ -18,7 +18,7 @@ services:
       "export KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092,BROKER://kafka:9093,TC-0://kafka:19092 && /etc/kafka/docker/run"
     ]
     environment:
-      - CLUSTER_ID=kafka-cluster 
+      - CLUSTER_ID=kafka-cluster
       - KAFKA_NODE_ID=1
       - KAFKA_INTER_BROKER_LISTENER_NAME=BROKER
       - KAFKA_PROCESS_ROLES=broker,controller
@@ -32,20 +32,3 @@ services:
       - KAFKA_LISTENERS=TC-0://kafka:19092,PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9094,BROKER://0.0.0.0:9093
       - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=BROKER:PLAINTEXT,PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,TC-0:PLAINTEXT
       - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092,BROKER://kafka:9093,TC-0://kafka:19092
-      
-  placement:
-    image: "daprio/placement"
-    container_name: dapr-placement
-    command: ["./placement", "--port", "50006"]
-    ports:
-      - "50006:50006"
-
-  scheduler:
-    image: "daprio/scheduler"
-    container_name: dapr-scheduler
-    command: ["./scheduler", "--port", "50007", "--etcd-data-dir", "/data"]
-    ports:
-      - "50007:50007"
-    user: root
-    volumes:
-      - "./dapr-etcd-data/:/data"

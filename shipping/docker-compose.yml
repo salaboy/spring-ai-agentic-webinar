@@ -1,45 +1,37 @@
-version: '3'
 services:
   shipping:
     build: ./
+    container_name: shipping
     ports:
-      - "9091:9091" # Dapr instances communicate over gRPC so we need to expose the gRPC port
+      - "9091:9091"
     environment:
-      - DAPR_HOST=dapr # Dapr sidecar host
-      - DAPR_PORT=50001 # Dapr sidecar port
+      - KAFKA_BROKERS=kafka:9093
+      - KAFKA_TOPIC=shipments
     depends_on:
-      - placement
-      
-  dapr:
-    image: "daprio/daprd:1.17.0"
+      - kafka
+
+  kafka:
+    image: apache/kafka
+    container_name: kafka
+    ports:
+      - "9092:9092"
+      - "19092:19092"
     command: [
-      "./daprd",
-      "--app-id", "shipping",
-      "--app-channel-address", "shipping",
-      "--app-port", "9091",
-      "--app-protocol", "grpc",
-      "--placement-host-address", "placement:50006", # Dapr's placement service can be reach via the docker DNS entry
-      "--scheduler-host-address", "scheduler:50007", # Dapr's scheduler service can be reach via the docker DNS entry
-      "--resources-path", "./components"
+      "sh", "-c",
+      "export KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092,BROKER://kafka:9093,TC-0://kafka:19092 && /etc/kafka/docker/run"
     ]
-    ports:
-      - "50001:50001" # Dapr sidecar gRPC port
-    volumes:
-        - "./components/:/components" # Mount our components folder for the runtime to use. The mounted location must match the --resources-path argument.
-    depends_on:
-      - shipping
-
-  placement:
-    image: "daprio/placement"
-    command: ["./placement", "--port", "50006"]
-    ports:
-      - "50006:50006"
-
-  scheduler:
-    image: "daprio/scheduler"
-    command: ["./scheduler", "--port", "50007", "--etcd-data-dir", "/data"]
-    ports:
-      - "50007:50007"
-    user: root
-    volumes:
-    - "./dapr-etcd-data/:/data"
+    environment:
+      - CLUSTER_ID=kafka-cluster
+      - KAFKA_NODE_ID=1
+      - KAFKA_INTER_BROKER_LISTENER_NAME=BROKER
+      - KAFKA_PROCESS_ROLES=broker,controller
+      - KAFKA_CONTROLLER_QUORUM_VOTERS=1@localhost:9094
+      - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_OFFSETS_TOPIC_NUM_PARTITIONS=1
+      - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
+      - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0
+      - KAFKA_LISTENERS=TC-0://kafka:19092,PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9094,BROKER://0.0.0.0:9093
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=BROKER:PLAINTEXT,PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,TC-0:PLAINTEXT
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092,BROKER://kafka:9093,TC-0://kafka:19092

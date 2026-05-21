@@ -1,4 +1,4 @@
-package com.example.store.step03.tracing;
+package com.example.store.tracing;
 
 import io.micrometer.tracing.TraceContext;
 

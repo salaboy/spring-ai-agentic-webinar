@@ -1,14 +1,13 @@
-# Step 3: PubSub Async Communications + Generated MCP
+# Spring AI + MCP + OpenTelemetry
 
-In this step you add event-driven capabilities to the store using [Dapr](https://dapr.io/) PubSub. When an order is placed, we should now call the 3rd-party `shipping` component responsible of shipments. When shipment is recorded, an event is published to a Kafka topic via Dapr, and clients receive real-time updates over a WebSocket connection.
+In this step you add event-driven capabilities to the store using [Apache Kafka](https://kafka.apache.org/). When an order is placed, we should now call the 3rd-party `shipping` component responsible of shipments. When shipment is recorded, an event is published to a Kafka topic, and clients receive real-time updates over a WebSocket connection. The store publishes and consumes via Spring Kafka's `KafkaTemplate` and `@KafkaListener`; the shipping service publishes via the `segmentio/kafka-go` Kafka client.
 
 Because we're building an AI-infused app, we want to integrate with `shipping` using MCP! However, `shipping` is 3rd-party and it proposed a gRPC service interface. To automatically, generate a MCP Server from this, we'll use [Reshapr](https://reshapr.io).
 
 ## What you will learn
 
 - Wrapping the third-party `shipping` component as a MCP service
-- Registering a new MCP tool into the app for shipment requests 
-- Using Dapr PubSub for environment-agnostic async messaging
+- Registering a new MCP tool into the app for shipment requests
 - Subscribing to domain events and forwarding them to WebSocket clients
 - Running Kafka locally via Testcontainers for integration tests
 - Testing event-driven architectures without coupling to a specific broker
@@ -24,14 +23,14 @@ Browser ──► Store (port 8080)
                                 └── Warehouse REST API (port 8086)
                           └── Shipping MCP Server (port 7777)
                                 └── Shipping gRPC API (port 9091)
-                                    └── Dapr Sidecar ──► Kafka (PubSub broker)
-              ├── Kafka (PubSub broker) ──► Dapr Sidecar
-                  └── Dapr Sidecar ──► Events Rest Controller (/api/events)
+                                    └── kafka-go producer ──► Kafka topic "shipments"
+              ├── Kafka topic "shipments" ──► @KafkaListener
+                  └── Events Rest Controller (/api/events)
                         └── WebSocket endpoint (/ws/events)
                               └── EventWebSocketHandler (real-time push to browser)
 ```
 
-Dapr acts as a portability layer — you can swap the underlying broker (Kafka, RabbitMQ, Redis Streams, etc.) by changing a Dapr component configuration without touching application code.
+The store uses Spring Kafka (`KafkaTemplate` + `@KafkaListener`) to publish and consume shipment events directly from Kafka, with no middleware sidecar in between.
 
 ## Prerequisites
 
@@ -44,7 +43,7 @@ Dapr acts as a portability layer — you can swap the underlying broker (Kafka, 
 
 ## Running the tests
 
-The test suite starts a Kafka container via Testcontainers and a Dapr test runtime:
+The test suite starts a Kafka container via Testcontainers and lets Spring Boot autoconfigure the producer/consumer via `@ServiceConnection`:
 
 ```bash
 cd step-03/store
@@ -53,34 +52,30 @@ mvn test
 ```
 
 **What to look for in the code:**
-- `ContainersConfig.java:67` — we start a `DaprContainer` that gates the PubSub broker
-- `StoreTests.java:39` — we're able to send and to receive messages from the PubSub broker in a very easy way.
+- `ContainersConfig.java` — we start a `KafkaContainer` annotated with `@ServiceConnection` so Spring Boot wires the bootstrap servers automatically.
+- `StoreTests.java` — we publish via `KafkaTemplate` and verify the `@KafkaListener` receives the message.
 
 ## Key source files
 
 | File | Description |
 |---|---|
-| `EventRestController` | Handles the consumption of PubSub messages pushed by the Dapr side car container |
+| `EventsRestController` | Hosts a `@KafkaListener` for the `shipments` topic and a `/mock` endpoint to publish events via `KafkaTemplate` |
 | `EventWebSocketHandler` | Handles WebSocket connections and pushes order events to clients |
 | `WebSocketConfig` | Registers the WebSocket handler at `/ws/events` |
-| `Event` | Domain event class published to the Dapr PubSub topic |
+| `Event` | Domain event class published to the Kafka `shipments` topic |
 
 
 ## Exercices
 
-### Exercice T1: Run store app with Mocked Events
+### Exercice T1: Run store app against a local Kafka broker
 
-**Goal:** Learn how Microcks + TestContainers decouples services during development and testing. You will run the store service with mocked events from Microcks instead of the real shipping, then verify the store behaves correctly when receiving events.
-
-**Background:** `ContainersConfig` in store declares a Microcks containers ensemble that is only started when the property `microcks.enabled=true` is set. When Microcks is active, we'll use it to register a new subscription in Dapr. For that, we'll use a microcks-provided Kafka topic that will receive mocked messages, so the store receive mock events instead of real ones. The mock events are driven by the examples in `shipping-asyncapi-1.0.0.yaml` — three Spring Boot products (T-Shirt, Socks, Sticker).
+**Goal:** Run the store service against a local Kafka broker started by Testcontainers, and verify the store correctly consumes shipment events published to the `shipments` topic.
 
 **What to look for in the code:**
-- `ContainersConfig.java:44` — the `KafkaContainer` that will be used as the PubSub broker
-- `ContainersConfig.java:53-62` — the `MicrocksContainersEnsemble` that will produce mocks events
-- `ContainersConfig.java:95-100` — the `Darp` subscription that rewires the application to the microcks-provide topic
-- `shipping-asyncapi-examples` and `shipping-asyncapi-1.0.0.yaml` — the mock data driving all events
+- `ContainersConfig.java` — the `KafkaContainer` annotated with `@ServiceConnection`
+- `EventsRestController.java` — the `@KafkaListener` that consumes `shipments` and the `/mock` endpoint that uses `KafkaTemplate.send`
 
-Start the store with the Dapr sidecar, the Kafka container and Microcks:
+Start the store with the Testcontainers-managed Kafka broker:
 
 ```bash
 cd step-03/store
@@ -88,9 +83,9 @@ cd step-03/store
 mvn spring-boot:test-run
 ```
 
-Open your browser at [http://localhost:8080](http://localhost:8080). Wait a few seconds and observe real-time WebSocket events in the UI. You should understand now where they come from 😉
+Open your browser at [http://localhost:8080](http://localhost:8080). Publish a mock event (for example via `POST /api/events/mock`) and observe real-time WebSocket events in the UI.
 
-Congrats! You just validate your store app can receive PubSub messages and transmit them to the UI!
+Congrats! You just validated that your store app can receive Kafka messages and transmit them to the UI!
 
 ### Exercice R1: Run the Infrastructure Components
 
@@ -105,21 +100,16 @@ cd step-03
 docker compose up -d
 ```
 
-This should produce the following output:
+This should produce something similar to the following output:
 
 ```bash
-[+] up 11/11
- ✔ Network step-03_default         Created                                              0.0s
- ✔ Container dapr-placement        Started                                              0.4s
- ✔ Container shipping              Started                                              0.4s
- ✔ Container kafka                 Started                                              0.4s
- ✔ Container reshapr-postgres      Started                                              0.5s
- ✔ Container jaeger                Started                                              0.4s
- ✔ Container dapr-scheduler        Started                                              0.4s
- ✔ Container dapr-shipping         Started                                              0.5s
- ✔ Container dapr-store            Started                                              0.5s
- ✔ Container reshapr-control-plane Healthy                                              5.9s
- ✔ Container reshapr-gateway-01    Started                                              5.9s
+[+] up 7/7
+ ✔ Container shipping              Started
+ ✔ Container kafka                 Started
+ ✔ Container reshapr-postgres      Started
+ ✔ Container jaeger                Started
+ ✔ Container reshapr-control-plane Healthy
+ ✔ Container reshapr-gateway-01    Started
 ```
 
 You can inspect the different containers that are running here. We run the shipping 3rd-party service as a container and we have started the reshapr containers for generating an MCP Server for it.
@@ -202,8 +192,3 @@ Place an order and observe real-time WebSocket events in the UI. 🎉
 
 Check `jaeger` to explore the different traces and spans created by the different components.
 
----
-
-## Next step
-
-Proceed to [Step 4: Durable Executions for Spring AI](../step-04/README.md) to make the order-processing pipeline resilient and long-running using Dapr Workflows.

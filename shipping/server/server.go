@@ -2,12 +2,13 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"sync"
 	"time"
 
-	dapr "github.com/dapr/go-sdk/client"
+	"github.com/segmentio/kafka-go"
 	pb "github.com/spring-io-2026-workshop/shipping/gen/shippingpb"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -16,8 +17,6 @@ import (
 )
 
 const (
-	pubsubName = "pubsub"
-	topic      = "shipments"
 	tracerName = "shipping-service"
 )
 
@@ -42,13 +41,13 @@ type ShippingServer struct {
 	mu        sync.Mutex
 	shipments map[string]*Shipment
 	counter   int
-	dapr      dapr.Client
+	kafka     *kafka.Writer
 }
 
-func NewShippingServer(daprClient dapr.Client) *ShippingServer {
+func NewShippingServer(kafkaWriter *kafka.Writer) *ShippingServer {
 	return &ShippingServer{
 		shipments: make(map[string]*Shipment),
-		dapr:      daprClient,
+		kafka:     kafkaWriter,
 	}
 }
 
@@ -133,12 +132,20 @@ func (s *ShippingServer) updateStatus(shipmentID string, status pb.ShipmentStatu
 }
 
 func (s *ShippingServer) publishStatusEvent(ctx context.Context, shipmentID, status string) {
-	event := &ShipmentStatusEvent{
+	event := ShipmentStatusEvent{
 		ShipmentID: shipmentID,
 		Status:     status,
 		StatusDate: time.Now().UTC().Format(time.RFC3339),
 	}
-	if err := s.dapr.PublishEvent(ctx, pubsubName, topic, event); err != nil {
+	payload, err := json.Marshal(event)
+	if err != nil {
+		log.Printf("Failed to marshal %s event for shipment %s: %v", status, shipmentID, err)
+		return
+	}
+	if err := s.kafka.WriteMessages(ctx, kafka.Message{
+		Key:   []byte(shipmentID),
+		Value: payload,
+	}); err != nil {
 		log.Printf("Failed to publish %s event for shipment %s: %v", status, shipmentID, err)
 		return
 	}
