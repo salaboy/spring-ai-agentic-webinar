@@ -473,11 +473,19 @@ export default function App() {
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [testMode, setTestMode] = useState(false)
   const [conversationId] = useState(() => crypto.randomUUID())
   const bottomRef = useRef<HTMLDivElement>(null)
   const mockEventCounter = useRef(0)
   const [tick, setTick] = useState(true)
 
+  useEffect(() => {
+    fetch('/api/config')
+      .then(res => res.json())
+      .then(data => setTestMode(data.testMode))
+      .catch(() => {})
+  }, [])
+  
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
@@ -549,6 +557,31 @@ export default function App() {
         updated[updated.length - 1] = { role: 'assistant', content: `Sorry, something went wrong: ${msg}` }
         return updated
       })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function sendMessageSync(overrideText?: string) {
+    const text = (overrideText ?? input).trim()
+    if (!text || loading) return
+
+    setMessages(prev => [...prev, { role: 'user', content: text }])
+    if (!overrideText) setInput('')
+    setLoading(true)
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId, message: text }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      setMessages(prev => [...prev, { role: 'assistant', content: data.response }])
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error'
+      setMessages(prev => [...prev, { role: 'assistant', content: `Sorry, something went wrong: ${msg}` }])
     } finally {
       setLoading(false)
     }
@@ -723,6 +756,20 @@ export default function App() {
       >
         SEND &gt;&gt;
       </button>
+      {testMode && <button
+        onClick={() => sendMessageSync()}
+        disabled={loading || !input.trim()}
+        style={{
+          padding: '10px 20px',
+          background: theme.accent, color: theme.primaryText,
+          border: 'none', borderRadius: '8px',
+          cursor: loading || !input.trim() ? 'not-allowed' : 'pointer',
+          opacity: loading || !input.trim() ? 0.6 : 1,
+          fontSize: '14px', fontWeight: 'bold', fontFamily: theme.font,
+        }}
+      >
+        SEND SYNC &gt;&gt;
+      </button>}
     </div>
   ) : (
     <div style={{
@@ -756,6 +803,20 @@ export default function App() {
       >
         Send
       </button>
+      {testMode && <button
+        onClick={() => sendMessageSync()}
+        disabled={loading || !input.trim()}
+        style={{
+          padding: '10px 20px',
+          background: theme.accent, color: theme.primaryText,
+          border: 'none', borderRadius: '8px',
+          cursor: loading || !input.trim() ? 'not-allowed' : 'pointer',
+          opacity: loading || !input.trim() ? 0.6 : 1,
+          fontSize: '14px', fontWeight: 'bold', fontFamily: theme.font,
+        }}
+      >
+        SendSync
+      </button>}
     </div>
   )
 
