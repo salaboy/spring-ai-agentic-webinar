@@ -46,7 +46,7 @@ jobs:
           provenance: mode=max
           platforms: linux/amd64,linux/arm64
           builder: buildx-multi-arch
-          file: step-04/shipping/Dockerfile
+          file: shipping/Dockerfile
           labels: |
             org.opencontainers.image.revision=${GITHUB_SHA}
             org.opencontainers.image.created=${{ steps.date.outputs.date }}
