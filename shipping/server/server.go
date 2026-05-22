@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
+	pb "github.com/salaboy/spring-ai-agentic-webinar/shipping/gen/shippingpb"
 	"github.com/segmentio/kafka-go"
-	pb "github.com/spring-io-2026-workshop/shipping/gen/shippingpb"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"

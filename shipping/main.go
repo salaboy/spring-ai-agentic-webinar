@@ -6,9 +6,9 @@ import (
 	"os"
 	"strings"
 
+	pb "github.com/salaboy/spring-ai-agentic-webinar/shipping/gen/shippingpb"
+	"github.com/salaboy/spring-ai-agentic-webinar/shipping/server"
 	"github.com/segmentio/kafka-go"
-	pb "github.com/spring-io-2026-workshop/shipping/gen/shippingpb"
-	"github.com/spring-io-2026-workshop/shipping/server"
 	"google.golang.org/grpc"
 )
 
