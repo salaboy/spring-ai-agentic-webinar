@@ -1,6 +1,6 @@
 services:
   shipping:
-    image: ghcr.io/salaboy/springio-shipping:step-03
+    image: ghcr.io/salaboy/springai-webinar-shipping:latest
     container_name: shipping
     extra_hosts:
       - "host.docker.internal:host-gateway"
