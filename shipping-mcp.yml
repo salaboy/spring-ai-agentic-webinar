@@ -9,9 +9,10 @@ services:
     environment:
       - KAFKA_BROKERS=kafka:9093
       - KAFKA_TOPIC=shipments
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
       - OTEL_SERVICE_NAME=shipping
       - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_PROPAGATORS=tracecontext,baggage
     depends_on:
       - kafka
     restart: on-failure

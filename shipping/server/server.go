@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	tracerName = "shipping-service"
+	tracerName = "shipping"
 )
 
 type ShipmentStatusEvent struct {
