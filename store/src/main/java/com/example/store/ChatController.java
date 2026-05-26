@@ -4,23 +4,11 @@ import com.example.store.model.MerchItem;
 import com.example.store.model.Order;
 import com.example.store.model.OrderLine;
 
-import io.modelcontextprotocol.client.McpClient;
-import io.modelcontextprotocol.client.McpSyncClient;
-import io.modelcontextprotocol.client.transport.HttpClientStreamableHttpTransport;
-import io.modelcontextprotocol.spec.McpSchema;
-import io.modelcontextprotocol.spec.McpSchema.Content;
-import io.modelcontextprotocol.spec.McpSchema.TextContent;
-
 import org.springframework.ai.tool.annotation.Tool;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-
-import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.ObjectMapper;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -59,13 +47,6 @@ public class ChatController {
             new MerchItem("Spring Statemachine","T-Shirt",  8, 29.99, "https://spring.io/img/projects/spring-statemachine.svg"),
             new MerchItem("Spring Statemachine","Sticker",  60,  4.99, "https://spring.io/img/projects/spring-statemachine.svg")
     );
-
-    //@Value("${shipping-mcp.baseUrl}")
-    //private String shippingMcpBaseUrl;
-
-    //@Value("${shipping-mcp.endpoint}")
-    //private String shippingMcpEndpoint;
-
 
     @Tool(description = "Get the stock quantity and price of a Spring merch item by project name and/or type (T-Shirt, Socks, Sticker)")
     public String getItemStock(String itemName) {
@@ -111,7 +92,6 @@ public class ChatController {
     @Tool(description = "Place a confirmed order for one or more Spring merch items. "
             + "Call this only after the user has explicitly confirmed they want to place the order. "
             + "Each line must include the project name, type (T-Shirt, Socks, or Sticker), and quantity.")
-
     public String placeOrder(List<OrderLine> items) {
         List<MerchItem> orderedItems = new ArrayList<>();
         double total = 0.0;
@@ -174,45 +154,4 @@ public class ChatController {
         }
         return sb.toString();
     }
-
-    /*
-    private void shipOrder(Order order) {
-        // Simulate shipping logic here (e.g. call external shipping API)
-        System.out.println("Shipping order: " + order);
-
-        final var transport = HttpClientStreamableHttpTransport.builder(shippingMcpBaseUrl)
-                .endpoint(shippingMcpEndpoint).build();
-        final var mcpClient = McpClient.sync(transport).build();
-        mcpClient.initialize();
-
-        try {
-            final var request = new McpSchema.CallToolRequest("ShipOrder", Map.of(
-                    "order_id", order.orderId(),
-                    "shipping_address", Map.of(
-                            "customer_id", "lbroudoux",
-                            "city", "Le Mans",
-                            "country", "France"
-                    )));
-            final var response = mcpClient.callTool(request);
-
-            if (response == null || response.content() == null || response.content().isEmpty()) {
-                throw new Exception("Failed to ship order: no response from shipping MCP");
-            }
-            List<Content> contents = response.content();
-            if (contents.isEmpty() || !"text".equals(contents.getFirst().type())) {
-                throw new Exception("Failed to ship order: unexpected response content");
-            }
-            String shippingResult = ((TextContent) contents.getFirst()).text();
-            System.out.println("Shipping result: " + shippingResult);
-
-            Map<String, Object> shipment = new ObjectMapper().readValue(shippingResult, new TypeReference<>() {});
-            System.out.println("Shipment id: " + shipment.get("shipmentId"));
-
-        } catch (Exception e) {
-            System.err.println("Error while shipping order: " + e.getMessage());
-        } finally {
-            mcpClient.closeGracefully();
-        }
-    }
-    */
 }
