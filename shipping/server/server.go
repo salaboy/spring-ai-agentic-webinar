@@ -13,6 +13,8 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -121,6 +123,37 @@ func (s *ShippingServer) ShipOrder(ctx context.Context, req *pb.ShipOrderRequest
 		EstimatedDeliveryDate: timestamppb.New(estimatedDelivery),
 		Status:                pb.ShipmentStatus_PENDING,
 	}, nil
+}
+
+func (s *ShippingServer) ShippingDelay(ctx context.Context, req *pb.ShippingDelayRequest) (*pb.ShippingDelayResponse, error) {
+	tracer := otel.Tracer(tracerName)
+	_, span := tracer.Start(ctx, "ShippingDelay")
+	defer span.End()
+
+	const delay = 10 * time.Second
+	log.Printf("ShippingDelay: sleeping for %s", delay)
+
+	select {
+	case <-time.After(delay):
+	case <-ctx.Done():
+		return nil, status.FromContextError(ctx.Err()).Err()
+	}
+
+	return &pb.ShippingDelayResponse{
+		Message:      "shipping delayed",
+		DelaySeconds: int32(delay / time.Second),
+	}, nil
+}
+
+func (s *ShippingServer) ShippingFailure(ctx context.Context, req *pb.ShippingFailureRequest) (*pb.ShippingFailureResponse, error) {
+	tracer := otel.Tracer(tracerName)
+	_, span := tracer.Start(ctx, "ShippingFailure")
+	defer span.End()
+
+	err := status.Error(codes.Internal, "shipping service failure")
+	span.RecordError(err)
+	log.Printf("ShippingFailure: returning %v", err)
+	return nil, err
 }
 
 func (s *ShippingServer) updateStatus(shipmentID string, status pb.ShipmentStatus) {

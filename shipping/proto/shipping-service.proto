@@ -30,9 +30,28 @@ enum ShipmentStatus {
     DELIVERED = 2;
 }
 
+message ShippingDelayRequest {}
+
+message ShippingDelayResponse {
+    string message = 1;
+    int32 delay_seconds = 2;
+}
+
+message ShippingFailureRequest {}
+
+message ShippingFailureResponse {
+    string message = 1;
+}
+
 // ShippingService provides operations for shipping orders.
 service ShippingService {
     // ShipOrder processes the shipping of an order and returns the shipment details.
     rpc ShipOrder(ShipOrderRequest) returns (ShipOrderResponse);
+
+    // ShippingDelay simulates a slow shipping operation by sleeping for 10 seconds before returning.
+    rpc ShippingDelay(ShippingDelayRequest) returns (ShippingDelayResponse);
+
+    // ShippingFailure simulates a server-side failure by returning a gRPC INTERNAL error (analogous to HTTP 500).
+    rpc ShippingFailure(ShippingFailureRequest) returns (ShippingFailureResponse);
 }
 

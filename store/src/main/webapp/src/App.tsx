@@ -323,9 +323,16 @@ function MessageBubble({
   )
 }
 
-// ─── Mock Event button ────────────────────────────────────────────────────────
+// ─── Shipping action button ──────────────────────────────────────────────────
 
-function MockEventButton({ theme, counterRef }: { theme: ThemePalette; counterRef: React.MutableRefObject<number> }) {
+function ShippingActionButton({
+  theme, endpoint, idleLabel, firstOfGroup,
+}: {
+  theme: ThemePalette
+  endpoint: string
+  idleLabel: string
+  firstOfGroup?: boolean
+}) {
   const [hovered, setHovered] = useState(false)
   const [status, setStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle')
   const isRetro = theme.name === 'retro'
@@ -333,13 +340,8 @@ function MockEventButton({ theme, counterRef }: { theme: ThemePalette; counterRe
   async function handleClick() {
     if (status === 'loading') return
     setStatus('loading')
-    const count = ++counterRef.current
     try {
-      const res = await fetch('/api/events/mock', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ shipmentId: `SHIPMENT-#${count}`, status: `shipped`, statusDate: new Date().toISOString() }),
-      })
+      const res = await fetch(endpoint, { method: 'POST' })
       setStatus(res.ok ? 'ok' : 'error')
     } catch {
       setStatus('error')
@@ -348,7 +350,7 @@ function MockEventButton({ theme, counterRef }: { theme: ThemePalette; counterRe
     }
   }
 
-  const label = status === 'loading' ? '...' : status === 'ok' ? '✓ Sent' : status === 'error' ? '✗ Error' : 'Mock Event'
+  const label = status === 'loading' ? '...' : status === 'ok' ? '✓ Sent' : status === 'error' ? '✗ Error' : idleLabel
 
   if (isRetro) {
     return (
@@ -358,7 +360,7 @@ function MockEventButton({ theme, counterRef }: { theme: ThemePalette; counterRe
         onMouseLeave={() => setHovered(false)}
         style={{
           ...getRaisedBox(theme),
-          marginLeft: 'auto',
+          ...(firstOfGroup ? { marginLeft: 'auto' } : {}),
           padding: '1px 10px',
           fontSize: '11px',
           fontWeight: 'bold',
@@ -383,7 +385,7 @@ function MockEventButton({ theme, counterRef }: { theme: ThemePalette; counterRe
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        marginLeft: 'auto',
+        ...(firstOfGroup ? { marginLeft: 'auto' } : {}),
         padding: '4px 12px',
         fontSize: '12px',
         fontWeight: 'bold',
@@ -476,7 +478,6 @@ export default function App() {
   const [testMode, setTestMode] = useState(false)
   const [conversationId] = useState(() => crypto.randomUUID())
   const bottomRef = useRef<HTMLDivElement>(null)
-  const mockEventCounter = useRef(0)
   const [tick, setTick] = useState(true)
 
   useEffect(() => {
@@ -644,7 +645,8 @@ export default function App() {
         {['File', 'Edit', 'View', 'Favorites', 'Tools', 'Help'].map(item => (
           <span key={item} style={{ cursor: 'default', padding: '1px 4px' }}>{item}</span>
         ))}
-        <MockEventButton theme={theme} counterRef={mockEventCounter} />
+        <ShippingActionButton theme={theme} endpoint="/api/chat/shipping-delay" idleLabel="Shipping Delay" firstOfGroup />
+        <ShippingActionButton theme={theme} endpoint="/api/chat/shipping-failure" idleLabel="Shipping Failure" />
         <ThemeToggle theme={theme} onToggle={toggleTheme} />
       </div>
 
@@ -712,7 +714,8 @@ export default function App() {
     }}>
       <span>🌱</span>
       Spring Merch Store
-      <MockEventButton theme={theme} counterRef={mockEventCounter} />
+      <ShippingActionButton theme={theme} endpoint="/api/chat/shipping-delay" idleLabel="Shipping Delay" firstOfGroup />
+      <ShippingActionButton theme={theme} endpoint="/api/chat/shipping-failure" idleLabel="Shipping Failure" />
       <ThemeToggle theme={theme} onToggle={toggleTheme} />
     </div>
   )

@@ -72,6 +72,26 @@ public class ChatRestController {
         return new ChatResponse(response);
     }
 
+    @PostMapping("/shipping-delay")
+    public ChatResponse shippingDelay() {
+        String response = chatClient.prompt()
+                .toolCallbacks(mcpTools)
+                .user("Invoke the ShippingDelay tool now and report its result.")
+                .call()
+                .content();
+        return new ChatResponse(response);
+    }
+
+    @PostMapping("/shipping-failure")
+    public ChatResponse shippingFailure() {
+        String response = chatClient.prompt()
+                .toolCallbacks(mcpTools)
+                .user("Invoke the ShippingFailure tool now and report its result.")
+                .call()
+                .content();
+        return new ChatResponse(response);
+    }
+
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> chatStream(@RequestBody ChatRequest request) {
         MessageChatMemoryAdvisor advisor = MessageChatMemoryAdvisor.builder(
