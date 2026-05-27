@@ -2,7 +2,6 @@ package com.example.store;
 
 import io.github.microcks.testcontainers.MicrocksContainer;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.boot.micrometer.tracing.opentelemetry.autoconfigure.otlp.OtlpTracingConnectionDetails;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
@@ -29,11 +28,6 @@ public class ContainersConfig {
                 .withNetworkAliases("jaeger");
     }
 
-    @Bean
-    OtlpTracingConnectionDetails otlpTracingConnectionDetails(GenericContainer<?> jaegerContainer) {
-        return transport -> "http://" + jaegerContainer.getHost() + ":"
-                + jaegerContainer.getMappedPort(4318) + "/v1/traces";
-    }
 
     @Bean
     @ServiceConnection

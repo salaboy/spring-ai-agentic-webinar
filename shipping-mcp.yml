@@ -68,7 +68,7 @@ services:
       retries: 3
 
   gateway-01:
-    image: registry.reshapr.io/reshapr/reshapr-proxy:nightly
+    image: quay.io/lbroudoux/reshapr-proxy:nightly
     container_name: reshapr-gateway-01
     extra_hosts:
       - "host.docker.internal:host-gateway"
