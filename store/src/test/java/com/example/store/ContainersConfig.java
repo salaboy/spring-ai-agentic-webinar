@@ -1,5 +1,6 @@
 package com.example.store;
 
+import io.arconia.opentelemetry.autoconfigure.traces.exporter.otlp.OtlpTracingConnectionDetails;
 import io.github.microcks.testcontainers.MicrocksContainer;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -56,5 +57,11 @@ public class ContainersConfig {
                 registrar.add("spring.ai.anthropic.base-url", () -> microcks.getRestMockEndpoint("Anthropic API", "0.83.0"));
             }
         };
+    }
+
+    @Bean
+    OtlpTracingConnectionDetails otlpTracingConnectionDetails(GenericContainer<?> jaegerContainer) {
+        return transport -> "http://" + jaegerContainer.getHost() + ":"
+                + jaegerContainer.getMappedPort(4318) + "/v1/traces";
     }
 }
