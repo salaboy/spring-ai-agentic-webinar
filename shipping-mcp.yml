@@ -9,7 +9,9 @@ services:
     environment:
       - KAFKA_BROKERS=kafka:9093
       - KAFKA_TOPIC=shipments
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
+      #- OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
+      - OTEL_EXPORTER_OTLP_ENDPOINT=https://ingress.eu-west-1.aws.dash0-dev.com
+      - OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer ${OTEL_EXPORTER_OTLP_TOKEN},Dash0-Dataset=spring-ai-webinar
       - OTEL_SERVICE_NAME=shipping
       - OTEL_TRACES_EXPORTER=otlp
       - OTEL_PROPAGATORS=tracecontext,baggage
@@ -50,6 +52,11 @@ services:
       - RESHAPR_ADMIN_PASSWORD=password
       - RESHAPR_ADMIN_EMAIL=reshapr@example.com
       - RESHAPR_DEFAULT_GATEWAY_TOKENS=my-super-secret-token-xyz
+      - QUARKUS_OTEL_EXPORTER_OTLP_ENDPOINT=https://ingress.eu-west-1.aws.dash0-dev.com
+      - QUARKUS_OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer ${OTEL_EXPORTER_OTLP_TOKEN},Dash0-Dataset=spring-ai-webinar
+      - QUARKUS_OTEL_TRACES_EXPORTER=otlp
+      - QUARKUS_OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - QUARKUS_OTEL_PROPAGATORS=tracecontext,baggage
       # Enable debug logging for the control plane to help with troubleshooting
       #- QUARKUS_LOG_CONSOLE_LEVEL=DEBUG
       #- QUARKUS_LOG_CATEGORY__IO_RESHAPR_CTRL__LEVEL=DEBUG
@@ -81,7 +88,12 @@ services:
       #- QUARKUS_LOG_CONSOLE_LEVEL=DEBUG
       #- QUARKUS_LOG_CATEGORY__IO_RESHAPR_PROXY__LEVEL=DEBUG
       # Configure the connectiong to the OpenTelemetry Collector running on the host machine
-      - QUARKUS_OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      #- QUARKUS_OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - QUARKUS_OTEL_EXPORTER_OTLP_ENDPOINT=https://ingress.eu-west-1.aws.dash0-dev.com
+      - QUARKUS_OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer ${OTEL_EXPORTER_OTLP_TOKEN},Dash0-Dataset=spring-ai-webinar
+      - QUARKUS_OTEL_TRACES_EXPORTER=otlp
+      - QUARKUS_OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - QUARKUS_OTEL_PROPAGATORS=tracecontext,baggage
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:7777/q/health/ready" ]
       start_period: 3s
