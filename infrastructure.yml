@@ -4,8 +4,27 @@ services:
     container_name: jaeger
     ports:
       - "16686:16686" # Jaeger UI
-      - "4317:4317" # Jaeger collector gRPC endpoint
-      - "4318:4318" # Jaeger collector HTTP endpoint
+    # OTLP receivers stay on container ports 4317/4318 but are no longer
+    # exposed to the host — the otel-collector fan-outs traces to Jaeger
+    # over the docker network.
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: otel-collector
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    ports:
+      - "4317:4317" # OTLP gRPC ingest (host → collector)
+      - "4318:4318" # OTLP HTTP ingest (host → collector)
+    environment:
+      - DASH0_OTLP_ENDPOINT=${DASH0_OTLP_ENDPOINT}
+      - DASH0_AUTH_TOKEN=${DASH0_AUTH_TOKEN}
+      - DASH0_DATASET=${DASH0_DATASET:-default}
+    depends_on:
+      - jaeger
+      - kafka
+    restart: on-failure
 
   kafka:
     image: apache/kafka

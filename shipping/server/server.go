@@ -12,11 +12,45 @@ import (
 	"github.com/segmentio/kafka-go"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	otelcodes "go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+// kafkaHeaderCarrier adapts kafka.Message headers to the OTel TextMapCarrier
+// interface so the configured propagator can inject/extract W3C traceparent.
+type kafkaHeaderCarrier struct {
+	msg *kafka.Message
+}
+
+func (c kafkaHeaderCarrier) Get(key string) string {
+	for _, h := range c.msg.Headers {
+		if h.Key == key {
+			return string(h.Value)
+		}
+	}
+	return ""
+}
+
+func (c kafkaHeaderCarrier) Set(key, value string) {
+	for i, h := range c.msg.Headers {
+		if h.Key == key {
+			c.msg.Headers[i].Value = []byte(value)
+			return
+		}
+	}
+	c.msg.Headers = append(c.msg.Headers, kafka.Header{Key: key, Value: []byte(value)})
+}
+
+func (c kafkaHeaderCarrier) Keys() []string {
+	keys := make([]string, 0, len(c.msg.Headers))
+	for _, h := range c.msg.Headers {
+		keys = append(keys, h.Key)
+	}
+	return keys
+}
 
 const (
 	tracerName = "shipping"
@@ -164,23 +198,44 @@ func (s *ShippingServer) updateStatus(shipmentID string, status pb.ShipmentStatu
 	}
 }
 
-func (s *ShippingServer) publishStatusEvent(ctx context.Context, shipmentID, status string) {
+func (s *ShippingServer) publishStatusEvent(ctx context.Context, shipmentID, eventStatus string) {
 	event := ShipmentStatusEvent{
 		ShipmentID: shipmentID,
-		Status:     status,
+		Status:     eventStatus,
 		StatusDate: time.Now().UTC().Format(time.RFC3339),
 	}
 	payload, err := json.Marshal(event)
 	if err != nil {
-		log.Printf("Failed to marshal %s event for shipment %s: %v", status, shipmentID, err)
+		log.Printf("Failed to marshal %s event for shipment %s: %v", eventStatus, shipmentID, err)
 		return
 	}
-	if err := s.kafka.WriteMessages(ctx, kafka.Message{
+
+	topic := s.kafka.Topic
+	tracer := otel.Tracer(tracerName)
+	ctx, span := tracer.Start(ctx, topic+" send",
+		trace.WithSpanKind(trace.SpanKindProducer),
+		trace.WithAttributes(
+			attribute.String("messaging.system", "kafka"),
+			attribute.String("messaging.operation.name", "send"),
+			attribute.String("messaging.destination.name", topic),
+			attribute.String("messaging.kafka.message.key", shipmentID),
+			attribute.String("shipment.id", shipmentID),
+			attribute.String("shipment.status", eventStatus),
+		),
+	)
+	defer span.End()
+
+	msg := kafka.Message{
 		Key:   []byte(shipmentID),
 		Value: payload,
-	}); err != nil {
-		log.Printf("Failed to publish %s event for shipment %s: %v", status, shipmentID, err)
+	}
+	otel.GetTextMapPropagator().Inject(ctx, kafkaHeaderCarrier{msg: &msg})
+
+	if err := s.kafka.WriteMessages(ctx, msg); err != nil {
+		span.RecordError(err)
+		span.SetStatus(otelcodes.Error, "kafka write failed")
+		log.Printf("Failed to publish %s event for shipment %s: %v", eventStatus, shipmentID, err)
 		return
 	}
-	log.Printf("Published %s event for shipment %s", status, shipmentID)
+	log.Printf("Published %s event for shipment %s", eventStatus, shipmentID)
 }

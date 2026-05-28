@@ -379,6 +379,10 @@ function ShippingActionButton({
     )
   }
 
+  const idleText = hovered ? theme.primary : theme.primaryText
+  const successText = '#bbf7d0'
+  const errorText = '#fecaca'
+
   return (
     <button
       onClick={handleClick}
@@ -390,9 +394,9 @@ function ShippingActionButton({
         fontSize: '12px',
         fontWeight: 'bold',
         cursor: status === 'loading' ? 'wait' : 'pointer',
-        color: status === 'ok' ? '#34d399' : status === 'error' ? '#f87171' : (hovered ? theme.primaryText : theme.primary),
-        background: hovered ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.15)',
-        border: `1px solid rgba(255,255,255,0.5)`,
+        color: status === 'ok' ? successText : status === 'error' ? errorText : idleText,
+        background: hovered ? '#ffffff' : 'rgba(255,255,255,0.18)',
+        border: `1px solid ${hovered ? '#ffffff' : 'rgba(255,255,255,0.8)'}`,
         borderRadius: '999px',
         transition: 'all 0.15s ease',
         fontFamily: theme.font,
@@ -446,9 +450,9 @@ function ThemeToggle({ theme, onToggle }: { theme: ThemePalette; onToggle: () =>
         fontSize: '12px',
         fontWeight: 'bold',
         cursor: 'pointer',
-        color: hovered ? theme.primaryText : theme.primary,
-        background: hovered ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.15)',
-        border: `1px solid rgba(255,255,255,0.5)`,
+        color: hovered ? theme.primary : theme.primaryText,
+        background: hovered ? '#ffffff' : 'rgba(255,255,255,0.18)',
+        border: `1px solid ${hovered ? '#ffffff' : 'rgba(255,255,255,0.8)'}`,
         borderRadius: '999px',
         transition: 'all 0.15s ease',
         fontFamily: theme.font,
