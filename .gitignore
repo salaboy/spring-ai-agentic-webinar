@@ -2,3 +2,4 @@ target/
 .env
 agent/*.jar
 .idea
+.DS_Store

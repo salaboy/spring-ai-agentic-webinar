@@ -8,7 +8,6 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.context.annotation.Bean;
 import org.springframework.lang.Nullable;
 import org.springframework.test.context.DynamicPropertyRegistrar;
-import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.kafka.KafkaContainer;
 import org.testcontainers.utility.DockerImageName;
@@ -22,8 +21,8 @@ public class ContainersConfig {
     }
 
     @Bean
-    OtlpTracingConnectionDetails otlpTracingConnectionDetails(GenericContainer<?> jaegerContainer) {
-        return transport -> System.getenv("OTEL_EXPORTER_OTLP_ENDPOINT");
+    OtlpTracingConnectionDetails otlpTracingConnectionDetails() {
+        return transport -> System.getenv("OTEL_EXPORTER_OTLP_ENDPOINT") + "/v1/traces";
     }
 
     @Bean
@@ -37,6 +36,17 @@ public class ContainersConfig {
     @Bean
     @ConditionalOnProperty(name = "microcks.enabled", havingValue = "true")
     MicrocksContainer microcks(Network network) {
+        /*
+        return new MicrocksContainer("quay.io/microcks/microcks-uber:nightly-native")
+            .withNetwork(network)
+            .withMainArtifacts("anthropic-openapi.yaml")
+            .withSecondaryArtifacts("anthropic-metadata.yaml", "anthropic-examples.yaml")
+            .withEnv("OTEL_EXPORTER_OTLP_ENDPOINT", System.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"))
+            .withEnv("OTEL_EXPORTER_OTLP_HEADERS_AUTHORIZATION", System.getenv("OTEL_EXPORTER_OTLP_HEADERS_AUTHORIZATION"))
+            .withDebugLogLevel();
+        */
+
+        // Works correctly. 
         return new MicrocksContainer(DockerImageName.parse("quay.io/lbroudoux/microcks-uber:nightly-native")
             .asCompatibleSubstituteFor("quay.io/microcks/microcks-uber:nightly-native"))
             .withNetwork(network)
