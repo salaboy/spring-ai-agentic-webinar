@@ -21,18 +21,9 @@ public class ContainersConfig {
         return Network.newNetwork();
     }
 
-    @Bean(name = "jaegerContainer")
-    GenericContainer<?> jaegerContainer(Network network) {
-        return new GenericContainer<>(DockerImageName.parse("jaegertracing/jaeger"))
-                .withNetwork(network)
-                .withExposedPorts(16686, 4317, 4318)
-                .withNetworkAliases("jaeger");
-    }
-
     @Bean
     OtlpTracingConnectionDetails otlpTracingConnectionDetails(GenericContainer<?> jaegerContainer) {
-        return transport -> "http://" + jaegerContainer.getHost() + ":"
-                + jaegerContainer.getMappedPort(4318) + "/v1/traces";
+        return transport -> System.getenv("OTEL_EXPORTER_OTLP_ENDPOINT");
     }
 
     @Bean
@@ -46,12 +37,16 @@ public class ContainersConfig {
     @Bean
     @ConditionalOnProperty(name = "microcks.enabled", havingValue = "true")
     MicrocksContainer microcks(Network network) {
-        return new MicrocksContainer("quay.io/microcks/microcks-uber:1.13.2-native")
+        return new MicrocksContainer(DockerImageName.parse("quay.io/lbroudoux/microcks-uber:nightly-native")
+            .asCompatibleSubstituteFor("quay.io/microcks/microcks-uber:nightly-native"))
             .withNetwork(network)
             .withMainArtifacts("anthropic-openapi.yaml")
             .withSecondaryArtifacts("anthropic-metadata.yaml", "anthropic-examples.yaml")
-            .withEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://jaeger:4317")
-            .withEnv("OTEL_TRACES_EXPORTER", "otlp")
+            .withEnv("OTEL_EXPORTER_OTLP_ENDPOINT", System.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"))
+            .withEnv("OTEL_EXPORTER_OTLP_HEADERS_AUTHORIZATION", System.getenv("OTEL_EXPORTER_OTLP_HEADERS_AUTHORIZATION"))
+            .withEnv("OTEL_TRACES_EXPORTER_ENABLED", "true")
+            .withEnv("OTEL_LOGS_EXPORTER_ENABLED", "true")
+            .withEnv("OTEL_METRICS_EXPORTER_ENABLED", "true")
             .withDebugLogLevel();
     }
 
