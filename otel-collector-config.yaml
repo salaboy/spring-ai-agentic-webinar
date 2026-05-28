@@ -23,6 +23,16 @@ processors:
       - key: deployment.environment
         value: dev
         action: upsert
+  # Tag kafkametrics receiver output with service.name=kafka so the cluster
+  # metrics surface alongside the broker's Java-agent metrics in Dash0.
+  resource/kafka:
+    attributes:
+      - key: service.name
+        value: kafka
+        action: upsert
+      - key: deployment.environment
+        value: dev
+        action: upsert
 
 exporters:
   otlp_grpc/jaeger:
@@ -36,17 +46,27 @@ exporters:
       Authorization: "Bearer ${env:DASH0_AUTH_TOKEN}"
       Dash0-Dataset: "${env:DASH0_DATASET}"
 
+  debug:
+    verbosity: basic
+
 service:
+  telemetry:
+    logs:
+      level: info
   pipelines:
     traces:
       receivers: [otlp]
       processors: [resource, batch]
-      exporters: [otlp_grpc/jaeger, otlp_grpc/dash0]
+      exporters: [otlp_grpc/jaeger, otlp_grpc/dash0, debug]
     metrics:
-      receivers: [otlp, kafkametrics]
+      receivers: [otlp]
       processors: [resource, batch]
-      exporters: [otlp_grpc/dash0]
+      exporters: [otlp_grpc/dash0, debug]
+    metrics/kafkacluster:
+      receivers: [kafkametrics]
+      processors: [resource/kafka, batch]
+      exporters: [otlp_grpc/dash0, debug]
     logs:
       receivers: [otlp]
       processors: [resource, batch]
-      exporters: [otlp_grpc/dash0]
+      exporters: [otlp_grpc/dash0, debug]

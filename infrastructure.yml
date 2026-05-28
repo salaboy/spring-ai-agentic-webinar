@@ -36,6 +36,8 @@ services:
       "sh", "-c",
       "export KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092,BROKER://kafka:9093,TC-0://kafka:19092 && /etc/kafka/docker/run"
     ]
+    volumes:
+      - ./agent/opentelemetry-javaagent.jar:/opt/otel/opentelemetry-javaagent.jar:ro
     environment:
       - CLUSTER_ID=kafka-cluster
       - KAFKA_NODE_ID=1
@@ -51,3 +53,18 @@ services:
       - KAFKA_LISTENERS=TC-0://kafka:19092,PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9094,BROKER://0.0.0.0:9093
       - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=BROKER:PLAINTEXT,PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,TC-0:PLAINTEXT
       - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092,BROKER://kafka:9093,TC-0://kafka:19092
+      # OpenTelemetry Java Agent — exports JVM + Kafka-broker JMX metrics
+      # (and any trace instrumentation the agent provides) to the collector.
+      - KAFKA_OPTS=-javaagent:/opt/otel/opentelemetry-javaagent.jar
+      - OTEL_SERVICE_NAME=kafka
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      - OTEL_METRIC_EXPORT_INTERVAL=30000
+      - OTEL_LOGS_EXPORTER=none
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=otlp
+      - OTEL_PROPAGATORS=tracecontext,baggage
+      - OTEL_RESOURCE_ATTRIBUTES=service.name=kafka,deployment.environment=dev
+      # Enable the JMX Metric Insight extension to scrape Kafka broker MBeans
+      # (request handler latency, ISR shrink rate, controller state, etc.).
+      - OTEL_JMX_TARGET_SYSTEM=kafka-broker
