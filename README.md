@@ -1,16 +1,76 @@
-# Spring AI + MCP + OpenTelemetry
+# Spring AI + MCP + OpenTelemetry Webinar
 
-In this step you add event-driven capabilities to the store using [Apache Kafka](https://kafka.apache.org/). When an order is placed, we should now call the 3rd-party `shipping` component responsible of shipments. When shipment is recorded, an event is published to a Kafka topic, and clients receive real-time updates over a WebSocket connection. The store publishes and consumes via Spring Kafka's `KafkaTemplate` and `@KafkaListener`; the shipping service publishes via the `segmentio/kafka-go` Kafka client.
+## Introduction
 
-Because we're building an AI-infused app, we want to integrate with `shipping` using MCP! However, `shipping` is 3rd-party and it proposed a gRPC service interface. To automatically, generate a MCP Server from this, we'll use [Reshapr](https://reshapr.io).
+Building agentic applications using Spring AI with MCP servers to connect agents with existing services, then dive into two areas that are easy to overlook but hard to fix later: testing your agents with [Microcks](https://microcks.io), observing them with OpenTelemetry, and understanding MCP interactions at scale with [Reshapr](https://reshapr.io).
 
-## What you will learn
+## Getting Started
 
-- Wrapping the third-party `shipping` component as a MCP service
-- Registering a new MCP tool into the app for shipment requests
-- Subscribing to domain events and forwarding them to WebSocket clients
-- Running Kafka locally via Testcontainers for integration tests
-- Testing event-driven architectures without coupling to a specific broker
+Start by cloning the repository and entering the project directory:
+
+```bash
+git clone https://github.com/salaboy/spring-ai-agentic-webinar.git
+cd spring-ai-agentic-webinar
+```
+
+---
+
+## Prerequisites
+
+All steps require the following tools. Install them before starting.
+
+### Java 21
+
+Required for all Spring Boot services.
+
+- **macOS:** `brew install openjdk@21`
+- **Linux/Windows:** Download from [Adoptium](https://adoptium.net/temurin/releases/?version=21) or [Oracle](https://www.oracle.com/java/technologies/downloads/#java21)
+
+Verify: `java -version`
+
+### Maven
+
+[maven.apache.org](https://maven.apache.org/download.cgi)
+
+### Node.js v22+ and npm
+
+[nodejs.org](https://nodejs.org/en/download)
+
+### Docker (with Docker Compose)
+
+Used to run infrastructure services (Jaeger, Kafka, PostgreSQL, Dapr sidecars) during tests and local development.
+
+- **All platforms:** Install [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+
+Verify: `docker --version && docker compose version`
+
+### Anthropic API Key
+
+The store application uses [Anthropic Claude](https://www.anthropic.com/claude) as its LLM. You need an API key.
+
+1. Sign up or log in at [console.anthropic.com](https://console.anthropic.com/)
+2. Create an API key in your account settings
+3. Export it in your shell: `export ANTHROPIC_API_KEY=your-key-here`
+
+### Dash0 trial environment
+
+The store application and the infrastructure uses [Dash0](https://www.dash0.com) as its OpenTelemetry. You need a DataSet and the associated API key.
+
+1. Sign up or log in at [app.dash0.com](https://app.dash0.com/)
+2. Create a `DataSet` and an `Auth Token` in your account
+3. Retrieve the OpenTelemetry Exporter address
+4. Export those environment variables in your shell:
+```sh
+export OTEL_EXPORTER_OTLP_ENDPOINT=<your-exporter-url-here-with-https>
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer <your-auth-token-here>,Dash0-Dataset=<your-dataset-here>" 
+export OTEL_EXPORTER_OTLP_HEADERS_AUTHORIZATION="Bearer <your-auth-token-here>"
+export DASH0_OTLP_ENDPOINT=<your-exporter-host-here-with-port-4317>
+export DASH0_AUTH_TOKEN=<your-auth-token-here>
+export DASH0_DATASET=<your-dataset-here>
+```
+
+---
+
 
 ## Architecture
 
@@ -19,8 +79,6 @@ Browser ──► Store (port 8080)
               ├── Spring AI ChatClient → Anthropic Claude
                   └── Anthropic Claude (LLM)
                     └── MCP tools (remote, via HTTP)
-                          └── Warehouse MCP Server (port 8087)
-                                └── Warehouse REST API (port 8086)
                           └── Shipping MCP Server (port 7777)
                                 └── Shipping gRPC API (port 9091)
                                     └── kafka-go producer ──► Kafka topic "shipments"
@@ -30,30 +88,7 @@ Browser ──► Store (port 8080)
                               └── EventWebSocketHandler (real-time push to browser)
 ```
 
-The store uses Spring Kafka (`KafkaTemplate` + `@KafkaListener`) to publish and consume shipment events directly from Kafka, with no middleware sidecar in between.
-
-## Prerequisites
-
-- Java 21 — [adoptium.net](https://adoptium.net/temurin/releases/?version=21)
-- Maven — [maven.apache.org](https://maven.apache.org/download.cgi)
-- Node.js v22+ and npm — [nodejs.org](https://nodejs.org/en/download)
-- Docker — [docker.com](https://www.docker.com/products/docker-desktop/)
-- An Anthropic API key — [console.anthropic.com](https://console.anthropic.com/)
-
-
-## Running the tests
-
-The test suite starts a Kafka container via Testcontainers and lets Spring Boot autoconfigure the producer/consumer via `@ServiceConnection`:
-
-```bash
-cd step-03/store
-export ANTHROPIC_API_KEY=your-key-here
-mvn test
-```
-
-**What to look for in the code:**
-- `ContainersConfig.java` — we start a `KafkaContainer` annotated with `@ServiceConnection` so Spring Boot wires the bootstrap servers automatically.
-- `StoreTests.java` — we publish via `KafkaTemplate` and verify the `@KafkaListener` receives the message.
+The store uses Spring Kafka (`KafkaTemplate` + `@KafkaListener`) to consume shipment events directly from Kafka, with no middleware sidecar in between.
 
 ## Key source files
 
@@ -64,63 +99,59 @@ mvn test
 | `WebSocketConfig` | Registers the WebSocket handler at `/ws/events` |
 | `Event` | Domain event class published to the Kafka `shipments` topic |
 
+## Understanding & Testing our Agentic Apps
 
-## Exercices
-
-### Exercice T1: Run store app against a local Kafka broker
-
-**Goal:** Run the store service against a local Kafka broker started by Testcontainers, and verify the store correctly consumes shipment events published to the `shipments` topic.
-
-**What to look for in the code:**
-- `ContainersConfig.java` — the `KafkaContainer` annotated with `@ServiceConnection`
-- `EventsRestController.java` — the `@KafkaListener` that consumes `shipments` and the `/mock` endpoint that uses `KafkaTemplate.send`
-
-Start the store with the Testcontainers-managed Kafka broker:
-
-```bash
-cd step-03/store
-
-mvn spring-boot:test-run
+```sh
+cd store
+mvn clean -Dspring-boot.run.jvmArguments="-Dmicrocks.enabled=true" spring-boot:test-run
 ```
 
-Open your browser at [http://localhost:8080](http://localhost:8080). Publish a mock event (for example via `POST /api/events/mock`) and observe real-time WebSocket events in the UI.
+**What to look for in the code:**
+- `ContainersConfig.java`:
+  * we start a `KafkaContainer` annotated with `@ServiceConnection` so Spring Boot wires the bootstrap servers automatically.
+  * we start a `MicrocksContainer` because of the `-Dmicrocks.enabled=true` property. We loade it with Anthropic API and mocks and override the default Anthropic SDK endpoint with a `DynamicPropertyRegistrar`
+- `StoreTests.java` — we publish via `KafkaTemplate` and verify the `@KafkaListener` receives the message.
 
-Congrats! You just validated that your store app can receive Kafka messages and transmit them to the UI!
+Open your browser at [http://localhost:8080](http://localhost:8080). 
 
-### Exercice R1: Run the Infrastructure Components
-
-**Goal:** Prepare the infrastructure for runn all the components locally. As we rely on a bunch of components, we made your life easy so that you'll just have to run the store appl in the next steps.
+* Publish a mock event (for example via `POST /api/events/mock`) and observe real-time WebSocket events in the UI.
+* Ask in the chat to `List all items` and see Microcks answering instead of Anthropic Claude.
 
 > [!NOTE]
-> You may still have a `jaeger` container running as we've asked Testcontainers to reuse previous instances. You can now safely stop it to save a few resources.
+> Inspect all traces, logs and metrics on Dash0 console.
+
+
+## Wiring tools to existing APIs with MCP
+
+Here we're using Docker Compose to run all the infrastructure components locally. 
 
 ```bash
-cd step-03
-
 docker compose up -d
 ```
 
 This should produce something similar to the following output:
 
 ```bash
-[+] up 7/7
- ✔ Container shipping              Started
- ✔ Container kafka                 Started
- ✔ Container reshapr-postgres      Started
- ✔ Container jaeger                Started
- ✔ Container reshapr-control-plane Healthy
- ✔ Container reshapr-gateway-01    Started
+[+] up 8/8
+ ✔ Network spring-ai-agentic-webinar_default Created                            0.0s
+ ✔ Container kafka                           Started                            0.3s
+ ✔ Container reshapr-postgres                Started                            0.3s
+ ✔ Container jaeger                          Started                            0.3s
+ ✔ Container reshapr-control-plane           Healthy                            7.9s
+ ✔ Container otel-collector                  Started                            0.4s
+ ✔ Container shipping                        Started                            0.4s
+ ✔ Container reshapr-gateway-01              Started                            7.9s
 ```
 
 You can inspect the different containers that are running here. We run the shipping 3rd-party service as a container and we have started the reshapr containers for generating an MCP Server for it.
 
-### Exercice A1: Add a new shipping-mcp MCP Server
+### Add a new shipping-mcp MCP Server
 
 **Goal:** Learn how Reshapr can easily generate an MCP Server from an API specification.
 
 **Steps:**
 
-1. **Be sure to have the infrastructure up and running** — this was the previous exercise outcome.
+1. **Be sure to have the infrastructure up and running** — this was the previous outcome.
 
 2. Install the Reshapr CLI:
 
@@ -145,7 +176,7 @@ You can inspect the different containers that are running here. We run the shipp
 4. Import the `shipping-service.proto` file and expose it as an MCP Server wrapping shipping running on port 9091:
 
    ```bash
-   reshapr import -f ./shipping-mcp/shipping-service.proto --be http://shipping:9091
+   reshapr import -f ./shipping-mcp/shipping-service.proto --be http://shipping:9091 --audit
    ```
 
    You should get the folowwing output:
@@ -156,7 +187,7 @@ You can inspect the different containers that are running here. We run the shipp
    ✅ Exposition is now active!
    Exposition ID  : 0Q1JVWGQPZKQ9
    Organization   : reshapr
-   Created on     : 2026-04-10T14:40:37.565477
+   Created on     : 2026-05-28T13:56:30.421801
    Service ID     : 0Q18650R54AFJ
    Service Name   : springio.workshop.v1.ShippingService
    Service Version: v1
@@ -173,16 +204,14 @@ You can inspect the different containers that are running here. We run the shipp
 6. **Bonus:** Reshapr can also wrap REST or GraphQL API as MCP Servers. Try to import the `https://raw.githubusercontent.com/open-meteo/open-meteo/refs/heads/main/openapi.yml` file and use `https://api.open-meteo.com` as the backend endpoint.
 
 
-### Exercice R2: Run the app and E2E test
+### Run the app and E2E test
 
 **Goal:** Start the store application and see it connect the dots!
 
-Start the store:
+Start the store, this time in `run` mode:
 
 ```bash
-cd step-03/store
-
-export ANTHROPIC_API_KEY=your-key-here
+cd store
 mvn spring-boot:run
 ```
 
@@ -190,5 +219,5 @@ Open your browser at [http://localhost:8080](http://localhost:8080).
 
 Place an order and observe real-time WebSocket events in the UI. 🎉
 
-Check `jaeger` to explore the different traces and spans created by the different components.
-
+> [!NOTE]
+> Inspect all traces, logs and metrics on Dash0 console.
