@@ -1,17 +1,23 @@
 package com.example.store;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.tool.ToolCallbackProvider;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 
 @RestController
 @RequestMapping("/api/chat")
 public class ChatRestController {
+
+    private static final Logger log = LoggerFactory.getLogger(ChatRestController.class);
 
     private static final String SYSTEM_PROMPT = """
             You are a helpful store assistant for the Spring Merch store.
@@ -90,6 +96,13 @@ public class ChatRestController {
                 .call()
                 .content();
         return new ChatResponse(response);
+    }
+
+    @PostMapping("/server-error")
+    public ResponseEntity<ChatResponse> serverError() {
+        log.error("Server error triggered from frontend: something failed on the server side");
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new ChatResponse("something failed on the server side"));
     }
 
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)

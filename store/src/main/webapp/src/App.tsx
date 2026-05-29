@@ -651,6 +651,7 @@ export default function App() {
         ))}
         <ShippingActionButton theme={theme} endpoint="/api/chat/shipping-delay" idleLabel="Shipping Delay" firstOfGroup />
         <ShippingActionButton theme={theme} endpoint="/api/chat/shipping-failure" idleLabel="Shipping Failure" />
+        <ShippingActionButton theme={theme} endpoint="/api/chat/server-error" idleLabel="Server Error" />
         <ThemeToggle theme={theme} onToggle={toggleTheme} />
       </div>
 
@@ -720,6 +721,7 @@ export default function App() {
       Spring Merch Store
       <ShippingActionButton theme={theme} endpoint="/api/chat/shipping-delay" idleLabel="Shipping Delay" firstOfGroup />
       <ShippingActionButton theme={theme} endpoint="/api/chat/shipping-failure" idleLabel="Shipping Failure" />
+      <ShippingActionButton theme={theme} endpoint="/api/chat/server-error" idleLabel="Server Error" />
       <ThemeToggle theme={theme} onToggle={toggleTheme} />
     </div>
   )
