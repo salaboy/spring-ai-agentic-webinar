@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -116,7 +116,7 @@ func (s *ShippingServer) ShipOrder(ctx context.Context, req *pb.ShipOrderRequest
 	s.shipments[shipmentID] = shipment
 
 	span.SetAttributes(attribute.String("shipment.id", shipmentID))
-	log.Printf("Shipment %s created for order %s", shipmentID, req.GetOrderId())
+	slog.InfoContext(ctx, "shipment created", "shipment.id", shipmentID, "order.id", req.GetOrderId())
 
 	// Publish "pending" event immediately
 	s.publishStatusEvent(ctx, shipmentID, "pending")
@@ -165,18 +165,24 @@ func (s *ShippingServer) ShippingDelay(ctx context.Context, req *pb.ShippingDela
 	defer span.End()
 
 	const delay = 10 * time.Second
-	log.Printf("ShippingDelay: sleeping for %s", delay)
+	slog.InfoContext(ctx, "ShippingDelay sleeping", "delay", delay.String())
 
-	select {
-	case <-time.After(delay):
-	case <-ctx.Done():
-		return nil, status.FromContextError(ctx.Err()).Err()
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+	done := time.After(delay)
+	for {
+		select {
+		case <-done:
+			return &pb.ShippingDelayResponse{
+				Message:      "shipping delayed",
+				DelaySeconds: int32(delay / time.Second),
+			}, nil
+		case <-ticker.C:
+			slog.WarnContext(ctx, "Processing your request...")
+		case <-ctx.Done():
+			return nil, status.FromContextError(ctx.Err()).Err()
+		}
 	}
-
-	return &pb.ShippingDelayResponse{
-		Message:      "shipping delayed",
-		DelaySeconds: int32(delay / time.Second),
-	}, nil
 }
 
 func (s *ShippingServer) ShippingFailure(ctx context.Context, req *pb.ShippingFailureRequest) (*pb.ShippingFailureResponse, error) {
@@ -186,7 +192,7 @@ func (s *ShippingServer) ShippingFailure(ctx context.Context, req *pb.ShippingFa
 
 	err := status.Error(codes.Internal, "shipping service failure")
 	span.RecordError(err)
-	log.Printf("ShippingFailure: returning %v", err)
+	slog.ErrorContext(ctx, "ShippingFailure returning error", "error", err)
 	return nil, err
 }
 
@@ -206,7 +212,7 @@ func (s *ShippingServer) publishStatusEvent(ctx context.Context, shipmentID, eve
 	}
 	payload, err := json.Marshal(event)
 	if err != nil {
-		log.Printf("Failed to marshal %s event for shipment %s: %v", eventStatus, shipmentID, err)
+		slog.ErrorContext(ctx, "failed to marshal shipment status event", "status", eventStatus, "shipment.id", shipmentID, "error", err)
 		return
 	}
 
@@ -234,8 +240,8 @@ func (s *ShippingServer) publishStatusEvent(ctx context.Context, shipmentID, eve
 	if err := s.kafka.WriteMessages(ctx, msg); err != nil {
 		span.RecordError(err)
 		span.SetStatus(otelcodes.Error, "kafka write failed")
-		log.Printf("Failed to publish %s event for shipment %s: %v", eventStatus, shipmentID, err)
+		slog.ErrorContext(ctx, "failed to publish shipment status event", "status", eventStatus, "shipment.id", shipmentID, "error", err)
 		return
 	}
-	log.Printf("Published %s event for shipment %s", eventStatus, shipmentID)
+	slog.InfoContext(ctx, "published shipment status event", "status", eventStatus, "shipment.id", shipmentID)
 }

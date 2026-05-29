@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"os"
 	"strings"
@@ -50,10 +50,13 @@ func initTracer(ctx context.Context) (func(context.Context) error, error) {
 }
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, nil)))
+
 	ctx := context.Background()
 	shutdown, err := initTracer(ctx)
 	if err != nil {
-		log.Fatalf("Failed to initialize tracer: %v", err)
+		slog.Error("failed to initialize tracer", "error", err)
+		os.Exit(1)
 	}
 	defer shutdown(ctx)
 
@@ -73,13 +76,14 @@ func main() {
 	}
 	defer func() {
 		if err := kafkaWriter.Close(); err != nil {
-			log.Printf("Failed to close Kafka writer: %v", err)
+			slog.Error("failed to close Kafka writer", "error", err)
 		}
 	}()
 
 	lis, err := net.Listen("tcp", ":9091")
 	if err != nil {
-		log.Fatalf("Failed to listen: %v", err)
+		slog.Error("failed to listen", "error", err)
+		os.Exit(1)
 	}
 
 	grpcServer := grpc.NewServer(
@@ -87,8 +91,12 @@ func main() {
 	)
 	pb.RegisterShippingServiceServer(grpcServer, server.NewShippingServer(kafkaWriter))
 
-	log.Printf("Shipping gRPC server listening on %s (kafka brokers=%s topic=%s)", lis.Addr(), brokers, topic)
+	slog.Info("shipping gRPC server listening",
+		"addr", lis.Addr().String(),
+		"kafka.brokers", brokers,
+		"kafka.topic", topic)
 	if err := grpcServer.Serve(lis); err != nil {
-		log.Fatalf("Failed to serve: %v", err)
+		slog.Error("failed to serve", "error", err)
+		os.Exit(1)
 	}
 }
