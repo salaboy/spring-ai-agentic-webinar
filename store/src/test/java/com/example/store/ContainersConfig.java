@@ -36,7 +36,7 @@ public class ContainersConfig {
     @Bean
     @ConditionalOnProperty(name = "microcks.enabled", havingValue = "true")
     MicrocksContainer microcks(Network network) {
-        /*
+        // Microcks official image.
         return new MicrocksContainer("quay.io/microcks/microcks-uber:nightly-native")
             .withNetwork(network)
             .withMainArtifacts("anthropic-openapi.yaml")
@@ -44,9 +44,9 @@ public class ContainersConfig {
             .withEnv("OTEL_EXPORTER_OTLP_ENDPOINT", System.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"))
             .withEnv("OTEL_EXPORTER_OTLP_HEADERS_AUTHORIZATION", System.getenv("OTEL_EXPORTER_OTLP_HEADERS_AUTHORIZATION"))
             .withDebugLogLevel();
-        */
 
-        // Works correctly. 
+        /*
+        // lbroudoux test image: works correctly. 
         return new MicrocksContainer(DockerImageName.parse("quay.io/lbroudoux/microcks-uber:nightly-native")
             .asCompatibleSubstituteFor("quay.io/microcks/microcks-uber:nightly-native"))
             .withNetwork(network)
@@ -58,6 +58,7 @@ public class ContainersConfig {
             .withEnv("OTEL_LOGS_EXPORTER_ENABLED", "true")
             .withEnv("OTEL_METRICS_EXPORTER_ENABLED", "true")
             .withDebugLogLevel();
+        */
     }
 
     @Bean
